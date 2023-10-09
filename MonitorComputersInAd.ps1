@@ -108,7 +108,7 @@ function GetImportantServicesStatus {
 }
 
 
-function DoProcess {
+function MonitorAdComputers {
     $computers = Get-ADComputer -filter * | Select-Object Name
     foreach ($computer in $computers)
     {
@@ -120,4 +120,4 @@ function DoProcess {
     }
 }
 
-DoProcess
+MonitorAdComputers
