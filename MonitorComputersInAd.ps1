@@ -86,10 +86,23 @@ function GetImportantServicesStatus {
         ComputerName = $ComputerName
         Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     }
-    #Get all services having the names: Dnscache, Spooler, WSearch, W32Time, Netlogon
-    $services = Get-CimInstance -Query 'Select * from Win32_Service where (Name = "Dnscache" OR Name = "Spooler" OR Name = "WSearch" OR Name = "W32Time" OR Name = "Netlogon")' -ComputerName $ComputerName
+    $mailContent = $null
+    #Get all services having the names: Dnscache, Spooler, RpcSs, W32Time, Netlogon
+    $services = Get-CimInstance -Query 'SELECT * from Win32_Service WHERE (Name = "Dnscache" OR Name = "Spooler" OR Name = "RpcSs" OR Name = "W32Time" OR Name = "Netlogon")' -ComputerName $ComputerName | Sort-Object -Property Name
     foreach ($service in $services) {
         $computerServices | Add-Member -MemberType NoteProperty -Name $service.Name -Value $service.state
+        if ($service.state -eq "Stopped") {
+            if ($null -eq $mailContent) {
+                $mailContent = "The following services are currently not running:`n"
+            }
+            $mailContent = $mailContent + $service.Name + "`n"
+        }
+        # Should we start the services here?
+        # $service | Invoke-CimMethod -Name StartService -ComputerName $ComputerName
+    }
+    # Call the email function here
+    if ($null -ne $mailContent) {
+        Write-Host $mailContent
     }
     return $computerServices
 }
