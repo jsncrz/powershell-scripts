@@ -25,7 +25,7 @@ function GetPerformanceForComputer {
     return $computerData;
 }
 
-function CheckForThresholds {
+function CheckForThresholdsAndNotify {
     param (
 		[Parameter(Mandatory)]
         [string]$ComputerName,
@@ -100,7 +100,7 @@ function DoProcess {
     foreach ($computer in $computers)
     {
         $computerData = GetPerformanceForComputer -ComputerName $computer.Name
-        CheckForThresholds -ComputerName $computer.Name -ComputerData $computerData
+        CheckForThresholdsAndNotify -ComputerName $computer.Name -ComputerData $computerData
         WriteToCsv -ComputerName $computer.Name -Data $computerData -Folder "Usage"
         $computerServices = GetImportantServicesStatus -ComputerName $computer.Name
         WriteToCsv -ComputerName $computer.Name -Data $computerServices -Folder "ServiceStat"
