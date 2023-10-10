@@ -13,13 +13,24 @@ function GetPerformanceForComputer {
     #Get disk C details
     $disks = Get-CimInstance Win32_LogicalDisk -ComputerName $computer.Name -Filter "DeviceID = 'C:'"
     #Create a hash table for easier handling in CSV
-    $computerProperties = [ordered]@{
-        ComputerName = $ComputerName
-        Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-        CpuUsage = [math]::Round($cpuUsage, 2)
-        RamUsage = [math]::Round($ramUsage, 2)
-        FreeDiskGbInC = [math]::Round($disks.FreeSpace / 1Gb, 2)
-        DiskUsagePercentInC =  [math]::Round(100 - (($disks.FreeSpace / $disks.Size) * 100), 2)
+    try {
+	$computerProperties = [ordered]@{
+	    ComputerName = $ComputerName
+	    Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+	    CpuUsage = [math]::Round($cpuUsage, 2)
+	    RamUsage = [math]::Round($ramUsage, 2)
+	    FreeDiskGbInC = [math]::Round($disks.FreeSpace / 1Gb, 2)
+	    DiskUsagePercentInC =  [math]::Round(100 - (($disks.FreeSpace / $disks.Size) * 100), 2)
+	}
+    } catch {
+	$computerProperties = [ordered]@{
+	    ComputerName = $ComputerName
+	    Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+	    CpuUsage = [int]($cpuUsage)
+	    RamUsage = [int]($ramUsage)
+	    FreeDiskGbInC = [int]($disks.FreeSpace / 1Gb)
+	    DiskUsagePercentInC =  [int](100 - (($disks.FreeSpace / $disks.Size) * 100))
+	}
     }
     $computerData = New-Object -TypeName psobject -Property $computerProperties
     return $computerData;
@@ -81,7 +92,7 @@ function WriteToCsv {
     $null = New-Item -Path $folderName -ItemType Directory -Force
     $csvFileName = "c:\HealthCheck\" +$Folder + "\" + $ComputerName + "_" + $date + ".csv"
     Write-Host "Writing csv in " $csvFileName
-    $Data | Export-CSV $csvFileName -Append -NoTypeInformation -Force
+    $Data | Export-CSV -Path $csvFileName -Append -NoTypeInformation -Force
 }
 
 
@@ -122,11 +133,17 @@ function MonitorAdComputers {
     $computers = Get-ADComputer -filter * | Select-Object Name
     foreach ($computer in $computers)
     {
-        $computerData = GetPerformanceForComputer -ComputerName $computer.Name
-        CheckForThresholdsAndNotify -ComputerName $computer.Name -ComputerData $computerData
-        WriteToCsv -ComputerName $computer.Name -Data $computerData -Folder "Usage"
-        $computerServices = GetImportantServicesStatus -ComputerName $computer.Name
-        WriteToCsv -ComputerName $computer.Name -Data $computerServices -Folder "ServiceStat"
+        # Test if the computer in AD can be pinged
+        if (Test-Connection -ComputerName $computer.Name -Quiet) {
+            $computerData = GetPerformanceForComputer -ComputerName $computer.Name
+            CheckForThresholdsAndNotify -ComputerName $computer.Name -ComputerData $computerData
+            WriteToCsv -ComputerName $computer.Name -Data $computerData -Folder "Usage"
+            $computerServices = GetImportantServicesStatus -ComputerName $computer.Name
+            WriteToCsv -ComputerName $computer.Name -Data $computerServices -Folder "ServiceStat"
+        } else {
+            Write-Host ("Cannot commmunicate with computer:{0}" -f $computer.Name)
+        }
+
     }
 }
 
