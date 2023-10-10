@@ -61,6 +61,7 @@ function CheckForThresholdsAndNotify {
     	if ($hasCriticalAlert -eq $true) {
      	    $mailSubject = "Critical alert in your performance thresholds!"
      	}
+      	#Replace this with the call to the mailing script
         Write-Host $mailContent
     }
 }
@@ -110,6 +111,7 @@ function GetImportantServicesStatus {
     }
     # Call the email function here
     if ($null -ne $mailContent) {
+      	#Replace this with the call to the mailing script
         Write-Host $mailContent
     }
     return $computerServices
