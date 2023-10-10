@@ -19,7 +19,7 @@ function GetPerformanceForComputer {
 	    Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 	    CpuUsage = [math]::Round($cpuUsage, 2)
 	    RamUsage = [math]::Round($ramUsage, 2)
-	    FreeDiskGbInC = [math]::Round($disks.FreeSpace / 1Gb, 2)
+	    FreeDiskGbInC = [math]::Round($disks[0].FreeSpace / 1Gb, 2)
 	    DiskUsagePercentInC =  [math]::Round(100 - (($disks.FreeSpace / $disks.Size) * 100), 2)
 	}
     } catch {
@@ -28,7 +28,7 @@ function GetPerformanceForComputer {
 	    Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 	    CpuUsage = [int]($cpuUsage)
 	    RamUsage = [int]($ramUsage)
-	    FreeDiskGbInC = [int]($disks.FreeSpace / 1Gb)
+	    FreeDiskGbInC = [int]($disks[0].FreeSpace / 1Gb)
 	    DiskUsagePercentInC =  [int](100 - (($disks.FreeSpace / $disks.Size) * 100))
 	}
     }
