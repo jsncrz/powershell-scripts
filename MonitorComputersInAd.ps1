@@ -33,26 +33,34 @@ function CheckForThresholdsAndNotify {
         [PsCustomObject]$ComputerData
     )
     $mailContent = $null
+    $mailSubject = "Alert in your performance thresholds!"
+    $hasCriticalAlert = $false
     # Check the CPU usage if over 90% or over 70%
     if ($ComputerData.CpuUsage -ge 90) {
+    	$hasCriticalAlert = $true
         $mailContent = $mailContent + "Critical! CPU Usage is " + $ComputerData.CpuUsage + "%`n"
     } elseif ($ComputerData.CpuUsage -ge 70) {
         $mailContent = $mailContent + "Warning! CPU Usage is " + $ComputerData.CpuUsage + "%`n"
     }
     # Check the Ram usage if over 90% or over 70%
     if ($ComputerData.RamUsage -ge 90 ) {
+    	$hasCriticalAlert = $true
         $mailContent = $mailContent + "Critical! RAM Usage is " + $ComputerData.RamUsage + "%`n"
     } elseif ($ComputerData.RamUsage -ge 70) {
         $mailContent = $mailContent + "Warning! RAM Usage is " + $ComputerData.RamUsage + "%`n"
     }
     # Check the percentage of free disk space if over 90% or over 70%
-    if ($ComputerData.FreeDiskPercentInC -ge 90 ) {
-        $mailContent = $mailContent + "Critical! Disk is already " + $ComputerData.FreeDiskPercentInC + "% full`n"
-    } elseif ($ComputerData.FreeDiskPercentInC -ge 70) {
-        $mailContent = $mailContent + "Warning! Disk is already " + $ComputerData.FreeDiskPercentInC + "% full`n"
+    if ($ComputerData.DiskUsagePercentInC -ge 90 ) {
+    	$hasCriticalAlert = $true
+        $mailContent = $mailContent + "Critical! Disk is already " + $ComputerData.DiskUsagePercentInC + "% full`n"
+    } elseif ($ComputerData.DiskUsagePercentInC -ge 70) {
+        $mailContent = $mailContent + "Warning! Disk is already " + $ComputerData.DiskUsagePercentInC + "% full`n"
     }
     # Call the email function here
     if ($null -ne $mailContent) {
+    	if ($hasCriticalAlert -eq $true) {
+     	    $mailSubject = "Critical alert in your performance thresholds!"
+     	}
         Write-Host $mailContent
     }
 }
