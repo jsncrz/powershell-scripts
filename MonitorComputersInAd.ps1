@@ -6,14 +6,13 @@ function GetPerformanceForComputer {
     Write-Host "Getting usage data from computer:" $ComputerName
     #Get CPU Usage from processor data
     $processorData = Get-CimInstance -ClassName Win32_Processor -ComputerName $ComputerName
-    $cpuUsage = $processorData.LoadPercentage
+    $cpuUsage = $processorData[0].LoadPercentage
     #Get RAM Usage from OS data
     $osData = Get-CimInstance -ClassName Win32_OperatingSystem -ComputerName $ComputerName
     $ramUsage = (($osData.TotalVisibleMemorySize - $osData.FreePhysicalMemory) / $osData.TotalVisibleMemorySize) * 100
     #Get disk C details
     $disks = Get-CimInstance Win32_LogicalDisk -ComputerName $computer.Name -Filter "DeviceID = 'C:'"
     #Create a hash table for easier handling in CSV
-    try {
 	$computerProperties = [ordered]@{
 	    ComputerName = $ComputerName
 	    Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
@@ -22,16 +21,6 @@ function GetPerformanceForComputer {
 	    FreeDiskGbInC = [math]::Round($disks[0].FreeSpace / 1Gb, 2)
 	    DiskUsagePercentInC =  [math]::Round(100 - (($disks.FreeSpace / $disks.Size) * 100), 2)
 	}
-    } catch {
-	$computerProperties = [ordered]@{
-	    ComputerName = $ComputerName
-	    Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-	    CpuUsage = [int]($cpuUsage)
-	    RamUsage = [int]($ramUsage)
-	    FreeDiskGbInC = [int]($disks[0].FreeSpace / 1Gb)
-	    DiskUsagePercentInC =  [int](100 - (($disks.FreeSpace / $disks.Size) * 100))
-	}
-    }
     $computerData = New-Object -TypeName psobject -Property $computerProperties
     return $computerData;
 }
@@ -140,6 +129,7 @@ function MonitorAdComputers {
             WriteToCsv -ComputerName $computer.Name -Data $computerData -Folder "Usage"
             $computerServices = GetImportantServicesStatus -ComputerName $computer.Name
             WriteToCsv -ComputerName $computer.Name -Data $computerServices -Folder "ServiceStat"
+            Write-Host ("Finished monitoring for computer:{0}" -f $computer.Name)
         } else {
             Write-Host ("Cannot commmunicate with computer:{0}" -f $computer.Name)
         }
