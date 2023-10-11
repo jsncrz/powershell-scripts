@@ -6,23 +6,26 @@ function GetPerformanceForComputer {
     Write-Host "Getting usage data from computer:" $ComputerName
     #Get CPU Usage from processor data
     $processorData = Get-CimInstance -ClassName Win32_Processor -ComputerName $ComputerName
-    $cpuUsage = $processorData[0].LoadPercentage
     #Get RAM Usage from OS data
     $osData = Get-CimInstance -ClassName Win32_OperatingSystem -ComputerName $ComputerName
     $ramUsage = (($osData.TotalVisibleMemorySize - $osData.FreePhysicalMemory) / $osData.TotalVisibleMemorySize) * 100
     #Get disk C details
     $disks = Get-CimInstance Win32_LogicalDisk -ComputerName $computer.Name -Filter "DeviceID = 'C:'"
     #Create a hash table for easier handling in CSV
-	$computerProperties = [ordered]@{
-	    ComputerName = $ComputerName
-	    Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-	    CpuUsage = [math]::Round($cpuUsage, 2)
-	    RamUsage = [math]::Round($ramUsage, 2)
-	    FreeDiskGbInC = [math]::Round($disks[0].FreeSpace / 1Gb, 2)
-	    DiskUsagePercentInC =  [math]::Round(100 - (($disks.FreeSpace / $disks.Size) * 100), 2)
-	}
-    $computerData = New-Object -TypeName psobject -Property $computerProperties
-    return $computerData;
+    $computerProperties = [PsCustomObject]@{
+        ComputerName = $ComputerName
+        Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    }
+    $index = 0
+    foreach ($processor in $processorData) {
+        $index++
+        $computerProperties | Add-Member -MemberType NoteProperty -Name ("CpuUsage" +$index)  -Value ([math]::Round($processor.LoadPercentage, 2))
+    }
+    $computerProperties | Add-Member -MemberType NoteProperty -Name NumCpus  -Value $index
+    $computerProperties | Add-Member -MemberType NoteProperty -Name RamUsage -Value ([math]::Round($ramUsage, 2))
+    $computerProperties | Add-Member -MemberType NoteProperty -Name FreeDiskGbInC -Value ([math]::Round($disks[0].FreeSpace / 1Gb, 2))
+    $computerProperties | Add-Member -MemberType NoteProperty -Name DiskUsagePercentInC -Value ([math]::Round(100 - (($disks.FreeSpace / $disks.Size) * 100), 2))
+    return $computerProperties;
 }
 
 function CheckForThresholdsAndNotify {
@@ -36,11 +39,14 @@ function CheckForThresholdsAndNotify {
     $mailSubject = "Alert in your performance thresholds!"
     $hasCriticalAlert = $false
     # Check the CPU usage if over 90% or over 70%
-    if ($ComputerData.CpuUsage -ge 90) {
-    	$hasCriticalAlert = $true
-        $mailContent = $mailContent + "Critical! CPU Usage is " + $ComputerData.CpuUsage + "%`n"
-    } elseif ($ComputerData.CpuUsage -ge 70) {
-        $mailContent = $mailContent + "Warning! CPU Usage is " + $ComputerData.CpuUsage + "%`n"
+    for($i=1; $i -le $ComputerData.NumCpus; $i++){
+        $cpuUsage = $ComputerData | select -ExpandProperty ("CpuUsage"+$i)
+        if ($cpuUsage -ge 90) {
+    	    $hasCriticalAlert = $true
+            $mailContent = $mailContent + "Critical! CPU Usage for Processor#" +$i+ " is " + $cpuUsage + "%`n"
+        } elseif ($cpuUsage -ge 70) {
+            $mailContent = $mailContent + "Warning! CPU Usage for Processor#" +$i+ " is " + $cpuUsage + "%`n"
+        }
     }
     # Check the Ram usage if over 90% or over 70%
     if ($ComputerData.RamUsage -ge 90 ) {
