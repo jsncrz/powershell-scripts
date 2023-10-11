@@ -41,8 +41,10 @@ function CheckForThresholdsAndNotify {
     # Check the CPU usage if over 90% or over 70%
     for($i=1; $i -le $ComputerData.NumCpus; $i++){
         $cpuUsage = $ComputerData | select -ExpandProperty ("CpuUsage"+$i)
-        if ($cpuUsage -ge 90) {
+        if ($hasCriticalAlert -eq $false -And $cpuUsage -ge 90) {
     	    $hasCriticalAlert = $true
+        }
+        if ($cpuUsage -ge 90) {
             $mailContent = $mailContent + "Critical! CPU Usage for Processor#" +$i+ " is " + $cpuUsage + "%`n"
         } elseif ($cpuUsage -ge 70) {
             $mailContent = $mailContent + "Warning! CPU Usage for Processor#" +$i+ " is " + $cpuUsage + "%`n"
