@@ -33,7 +33,7 @@ function CheckForThresholdsAndNotify {
         [PsCustomObject]$ComputerData
     )
     $mailContent = $null
-    $mailSubject = "Alert in your performance thresholds!"
+    $mailSubject = "Alert in your performance thresholds for computer " + $ComputerName
     $hasCriticalAlert = $false
     # Check the CPU usage if over 90% or over 70%
     if ($ComputerData.CpuUsage -ge 90) {
@@ -59,10 +59,13 @@ function CheckForThresholdsAndNotify {
     # Call the email function here
     if ($null -ne $mailContent) {
     	if ($hasCriticalAlert -eq $true) {
-     	    $mailSubject = "Critical alert in your performance thresholds!"
+     	    $mailSubject = "Critical alert in your performance thresholds for " + $computerName
      	}
-      	#Replace this with the call to the mailing script
-        Write-Host $mailContent
+        $params = @{
+            Subject    = $mailSubject
+            Body       = $mailContent
+        }
+        & './SendMailScript.ps1' @params
     }
 }
 
@@ -111,8 +114,11 @@ function GetImportantServicesStatus {
     }
     # Call the email function here
     if ($null -ne $mailContent) {
-      	#Replace this with the call to the mailing script
-        Write-Host $mailContent
+        $params = @{
+            Subject    = "There are services stopped in " + $ComputerName
+            Body       = $mailContent
+        }
+        & './SendMailScript.ps1' @params
     }
     return $computerServices
 }
