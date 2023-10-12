@@ -82,7 +82,6 @@ function MergeCsvs {
 
 if ($Quiet -eq $true) {
     # AvgUsage
-    MergeCsvs
     MergeCsvs -Format "Weekly" -Monitoring "Usage"
     MergeCsvs -Format "Weekly" -Monitoring "ServiceStat"
     MergeCsvs -Format "Daily" -Monitoring "Usage"
