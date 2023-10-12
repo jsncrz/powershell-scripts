@@ -1,0 +1,20 @@
+td, th {
+    border: 1px solid #ddd;
+    padding: 10px;
+}
+
+tr:nth-child(even) {
+    background-color: #D3D3D3;
+}
+
+tr:hover {
+    background-color: #CCC;
+}
+
+th {
+    padding-top: 10px;
+    padding-bottom: 10px;
+    text-align: left;
+    background-color: #04AA6D;
+    color: white;
+}
