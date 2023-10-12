@@ -1,10 +1,11 @@
 
 param(
     [boolean]$Quiet = $false, 
-    $Date = (Get-Date))
+    $Date = (Get-Date),
+    $Format = "Daily")
 	
 # Obtaining performance information
-function GatherPerInfo {
+function AvgUsage {
     param(
     [string]$Date = ""
     )
@@ -43,6 +44,7 @@ function GatherPerInfo {
         }
         $DailyReport += [PSCustomObject]$dailyAverage
     } 
+    $null = New-Item -Path "C:\Reports" -ItemType Directory -Force
     if ($Date -eq "") {
         $fileName = ".\reports\Weekly_Average_Usage_Report_$((Get-Date).Year)$((Get-Date).Month)$((Get-Date).Day).html"
     
@@ -54,25 +56,41 @@ function GatherPerInfo {
 
 function MergeCsvs {
     param(
-    [string]$Date = ""
+    [string]$Date = "",
+    [string]$Format = "Daily",
+    [string]$Monitoring = "Usage"
     )
-    $weeklyData = Get-ChildItem -Path "C:\HealthCheck\Usage" -Filter "*$.csv" `
-    | Where-Object { $_.CreationTime -ge (Get-Date).AddDays(-7) -and $_.CreationTime -le (Get-Date) } `
-    | Select-Object -ExpandProperty FullName | Import-Csv
     
-    if ($Date -eq "") {
-        $fileName = ".\reports\Weekly_Usage_Report_$((Get-Date).Year)$((Get-Date).Month)$((Get-Date).Day).html"
-    } else {
-        $fileName = ".\reports\Weekly_Usage_Report_$Date.html"
+    $dateTime = Get-Date
+    if ($Date -ne "") {
+        $datetime = [datetime]::parseexact($Date, "yyyyMMdd", $null)
     }
-    [PSCustomObject]$weeklyData  | ConvertTo-Html -CssUri .\table.css | Set-Content $fileName
+    if ($Format -eq "Daily") {
+        $data = Get-ChildItem -Path "C:\HealthCheck\$Monitoring" -Filter "*$Date.csv" `
+        | Where-Object { $_.CreationTime -ge $dateTime.AddDays(-1) -and $_.CreationTime -le $dateTime.AddDays(1) } `
+        | Select-Object -ExpandProperty FullName | Import-Csv
+    } else {
+        $Format = "Weekly"
+        $data = Get-ChildItem -Path "C:\HealthCheck\$Monitoring" -Filter "*.csv" `
+        | Where-Object { $_.CreationTime -ge $dateTime.AddDays(-7) -and $_.CreationTime -le $dateTime } `
+        | Select-Object -ExpandProperty FullName | Import-Csv
+    }
+    $null = New-Item -Path "C:\HealthCheck\Reports" -ItemType Directory -Force
+    $fileName = "C:\HealthCheck\Reports\"+$Format+"_"+$Monitoring+"_Report_$($datetime.Year)$($datetime.Month)$($datetime.Day).html"
+    [PSCustomObject]$data  | ConvertTo-Html -CssUri .\table.css | Set-Content $fileName
 }
 
 if ($Quiet -eq $true) {
-    GatherPerInfo
+    # AvgUsage
     MergeCsvs
+    MergeCsvs -Format "Weekly" -Monitoring "Usage"
+    MergeCsvs -Format "Weekly" -Monitoring "ServiceStat"
+    MergeCsvs -Format "Daily" -Monitoring "Usage"
+    MergeCsvs -Format "Daily" -Monitoring "ServiceStat"
 } else {
     $date = Read-Host -Prompt "Enter date in YYYYMMDD Format"
-    GatherPerInfo -Date $date
-    MergeCsvs -Date $date
+    $format = Read-Host -Prompt "Enter Daily Or Weekly"
+    $monitoring = Read-Host -Prompt "Enter Usage Or ServiceStat"
+    # AvgUsage -Date $date
+    MergeCsvs -Date $date -Format $format -Monitoring $monitoring
 }
