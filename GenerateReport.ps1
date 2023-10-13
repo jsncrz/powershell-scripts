@@ -82,10 +82,14 @@ function MergeCsvs {
 
 if ($Quiet -eq $true) {
     # AvgUsage
-    MergeCsvs -Format "Weekly" -Monitoring "Usage"
-    MergeCsvs -Format "Weekly" -Monitoring "ServiceStat"
-    MergeCsvs -Format "Daily" -Monitoring "Usage"
-    MergeCsvs -Format "Daily" -Monitoring "ServiceStat"
+    if ($Format -eq "Weekly") {
+	    MergeCsvs -Format "Weekly" -Monitoring "Usage"
+	    MergeCsvs -Format "Weekly" -Monitoring "ServiceStat"
+    }
+    if ($Format -eq "Daily") {
+	    MergeCsvs -Format "Daily" -Monitoring "Usage"
+	    MergeCsvs -Format "Daily" -Monitoring "ServiceStat"
+    }
 } else {
     $date = Read-Host -Prompt "Enter date in YYYYMMDD Format"
     $format = Read-Host -Prompt "Enter Daily Or Weekly"
