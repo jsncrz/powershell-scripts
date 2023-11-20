@@ -2,6 +2,9 @@
 
 # Imports
 Import-Module .\Manage-Logs.psm1 -Force
+Import-Module NetTCPIP
+Import-Module DnsClient
+Import-Module DnsClient
 
 # Declarations
 $IpAddressRegex = "^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}$"
@@ -48,7 +51,7 @@ function Set-ComputerNetworkConfiguration {
                 $networkIndex = Read-Host "Enter the index of the Network Adapter to be updated"
                 $networkAdapter = $networkAdapters | Where-Object { $_.InterfaceIndex -eq $networkIndex }
                 if ($null -ne $networkAdapter ) {
-                    Write-Log -Message "Updating $($networkAdapter.Description)'s Configuration!"
+                    Write-Log -Message "Updating $($networkAdapter.Description)'s Configuration!" Verbose
                     Clear-Host
                     do {
                         $choice = Read-ConfigChoice 
@@ -76,17 +79,17 @@ function Set-ComputerNetworkConfiguration {
                         $networkAdapters = Get-CimSessionNetworkAdapter $CimSession 
                         $networkAdapter = $networkAdapters | Where-Object { $_.InterfaceIndex -eq $networkIndex }
                     } while ($choice -ne 7)
-                    Write-Log -Message "Updated $($networkAdapter.Description)'s Configuration!"
+                    Write-Log -Message "Updated $($networkAdapter.Description)'s Configuration!" Verbose
                 }
                 else {
-                    Write-Log -Message "Network Adapter with Index $networkIndex does not exist!" -Level "Error"
+                    Write-Log -Message "Network Adapter with Index $networkIndex does not exist!" -Level Error
                     Write-Host "Network Adapter with Index $networkIndex does not exist!" -ForegroundColor Red
                 }
             } while ($null -eq $networkAdapter )
         }
     
         catch {
-            Write-Log -Message $_.Exception.Message -Level "Error"
+            Write-Log -Message $_.Exception.Message -Level Error
             Write-Host "An error occurred:"
             Write-Host $_.Exception.Message
             Write-Host $_.ScriptStackTrace
@@ -111,7 +114,7 @@ function Get-CimSessionNetworkAdapter {
             Position = 0)]
         $CimSession
     )
-    $networkAdapters = Get-CimInstance -ClassName Win32_NetworkAdapterConfiguration -CimSession $CimSession -Filter "IPEnabled = 'True'"
+    $networkAdapters = Get-CimInstance -ClassName Win32_NetworkAdapterConfiguration -CimSession $CimSession -Filter "IPEnabled = 'True'" -EA stop
     foreach ($networkAdapter in $networkAdapters) {
         $dnsAddress = Get-DnsClientServerAddress -InterfaceIndex $networkAdapter.InterfaceIndex -CimSession $CimSession
         $networkAdapter | Add-Member -NotePropertyName DnsAddress -NotePropertyValue $dnsAddress.ServerAddresses
@@ -155,7 +158,7 @@ function New-IpAddressConfig {
             Position = 1)]
         $CimSession
     )
-    Remove-NetIPAddress -InterfaceIndex $NetworkAdapter.InterfaceIndex -CimSession $CimSession 
+    Remove-NetIPAddress -InterfaceIndex $NetworkAdapter.InterfaceIndex -CimSession $CimSession -EA stop
     $ipConfig = New-IpAddressSplat $NetworkAdapter $CimSession
     try {
         $newIp = New-NetIPAddress @ipConfig
@@ -166,12 +169,11 @@ function New-IpAddressConfig {
         Write-Log "IP Address has been successfully added. Current values are `n`tIP Address: $($newIp.IPAddress)`n`tSubnet Mask: $($newIp.PrefixLength)"
     }
     catch {
-        Write-Log -Message $_.Exception.Message -Level "Error"
+        Write-Log -Message $_.Exception.Message -Level Error
         Write-Host "An error occurred:"
         Write-Host $_.Exception.Message
         Write-Host $_.ScriptStackTrace
     }
-    $newIp
 }
 
 function Set-IpAddressConfig {
@@ -185,17 +187,22 @@ function Set-IpAddressConfig {
             Position = 1)]
         $CimSession
     )
-    $ipAddresses = $NetworkAdapter.IPAddress
+    [array]$ipAddresses = $NetworkAdapter.IPAddress
     if ($ipAddresses.Length -gt 0) {
+        Write-Host "IP Addresses: "
         for ($ctr = 0; $ctr -lt $ipAddresses.Length; $ctr++) {
-            Write-Host "[$ctr]: " $ipAddresses[$ctr] 
+            Write-Host "`t[$ctr]:" $ipAddresses[$ctr]
         }
+        Write-Host "`t[X]: Exit"
         do {
             $ipIndex = Read-Host "Enter the index of the IP address from the list above"
-        } while ($ipIndex -notmatch $NumericRegex -or [int]$ipIndex -ge $ipAddresses.Length -or [int]$ipIndex -lt 0)
+        } while (($ipIndex -ne 'X' -or $ipIndex -ne 'x') -and ($ipIndex.Length -eq 0 -or $ipIndex -notmatch $NumericRegex -or [int]$ipIndex -ge $ipAddresses.Length -or [int]$ipIndex -lt 0))
+        if ($ipIndex -eq 'X' -or $ipIndex -eq 'x') {
+            return
+        }
         do {
             $subnet = Read-Host "Enter a valid subnet: (1-32)"
-        } while ([int]$subnet -ge 33 -or [int]$subnet -le 0)
+        } while ($subnet -notmatch $NumericRegex -or [int]$subnet -ge 33 -or [int]$subnet -le 0)
         $ipConfig = @{
             InterfaceIndex = $NetworkAdapter.InterfaceIndex
             IpAddress      = $ipAddresses[$ipIndex]
@@ -203,7 +210,7 @@ function Set-IpAddressConfig {
             PrefixLength   = $subnet
         }
         try {
-            $ip = Set-NetIPAddress @ipConfig -PassThru
+            $ip = Set-NetIPAddress @ipConfig -PassThru -EA stop
             Clear-Host
             Write-Host "IP Address has been successfully updated. Current values are `n" `
                 "`tIP Address: $($ip.IPAddress)`n" `
@@ -211,7 +218,7 @@ function Set-IpAddressConfig {
             Write-Log "IP Address has been successfully updated. Current values are `n `tIP Address: $($ip.IPAddress)`n`tSubnet Mask: $($ip.PrefixLength)"
         }
         catch {
-            Write-Log -Message $_.Exception.Message -Level "Error"
+            Write-Log -Message $_.Exception.Message -Level Error
             Write-Host "An error occurred:"
             Write-Host $_.Exception.Message
             Write-Host $_.ScriptStackTrace
@@ -220,7 +227,6 @@ function Set-IpAddressConfig {
     else {
         Write-Host "There are no IP Addresses to update"
     }
-    $ip
 }
 
 #This function creates the IP config splat
@@ -267,18 +273,17 @@ function New-DefaultGateway {
         $defaultGateway = Read-Host "Enter a valid Gateway (0.0.0.0 - 255.255.255.255)"
     } while ($defaultGateway -notmatch $IpAddressRegex)
     try {
-        $null = New-NetRoute -DestinationPrefix "0.0.0.0/0" -InterfaceIndex $NetworkAdapter.InterfaceIndex -NextHop $defaultGateway  -CimSession $CimSession
+        $null = New-NetRoute -DestinationPrefix "0.0.0.0/0" -InterfaceIndex $NetworkAdapter.InterfaceIndex -NextHop $defaultGateway  -CimSession $CimSession -EA stop
         Clear-Host
-        Write-Host "$defaultGateway has been sucessfully added to the Default Gateways"
-        Write-Log "$defaultGateway has been sucessfully added to the Default Gateways"
+        Write-Host "$defaultGateway has been successfully added to the Default Gateways"
+        Write-Log "$defaultGateway has been successfully added to the Default Gateways"
     }
     catch {
-        Write-Log -Message $_.Exception.Message -Level "Error"
+        Write-Log -Message $_.Exception.Message -Level Error
         Write-Host "An error occurred:"
         Write-Host $_.Exception.Message
         Write-Host $_.ScriptStackTrace
     }
-    $ip
 }
 
 function Remove-DefaultGateway {
@@ -292,30 +297,36 @@ function Remove-DefaultGateway {
             Position = 1)]
         $CimSession
     )
-    
-    $gatewayRoutes = Get-NetRoute -InterfaceIndex $NetworkAdapter.InterfaceIndex -DestinationPrefix "0.0.0.0/0" -CimSession $CimSession
-    $gateways = $gatewayRoutes.NextHop
-    if ($gateways.Length -gt 0) {
-        for ($ctr = 0; $ctr -lt $gateways.Length; $ctr++) {
-            Write-Host "[$ctr]: " $gateways[$ctr] 
-        }
-        do {
-            $gatewayIndex = Read-Host "Enter the index of the Default Gateway to be removed from the list above"
-        } while ($gatewayIndex -notmatch $NumericRegex -or [int]$gatewayIndex -ge $gateways.Length -or [int]$gatewayIndex -lt 0)
-        try {
-            $null = Remove-NetRoute -NextHop $gateways[$gatewayIndex] -InterfaceIndex $NetworkAdapter.InterfaceIndex -CimSession $CimSession
-            Clear-Host
-            Write-Host "$($gateways[$gatewayIndex]) has been sucessfully removed from the Default Gateways"
-            Write-Log "$($gateways[$gatewayIndex]) has been sucessfully removed from the Default Gateways"
-        }
-        catch {
-            Write-Log -Message $_.Exception.Message -Level "Error"
-            Write-Host "An error occurred:"
-            Write-Host $_.Exception.Message
-            Write-Host $_.ScriptStackTrace
+    try {
+        [array]$gateways = Get-NetRoute -InterfaceIndex $NetworkAdapter.InterfaceIndex -DestinationPrefix "0.0.0.0/0" -CimSession $CimSession -EA stop
+        
+        if ($gateways.Length -gt 0) {
+            Write-Host "Default Gateway Addresses:"
+            for ($ctr = 0; $ctr -lt $gateways.Length; $ctr++) {
+                Write-Host "`t[$ctr]:" $gateways[$ctr].NextHop
+            }
+            Write-Host "`t[X]: Exit"
+            do {
+                $gatewayIndex = Read-Host "Enter the index of the Default Gateway to be removed from the list above"
+            } while (($gatewayIndex -ne 'X' -or $gatewayIndex -ne 'x') -and ($gatewayIndex.Length -eq 0 -or $gatewayIndex -notmatch $NumericRegex -or [int]$gatewayIndex -ge $gateways.Length -or [int]$gatewayIndex -lt 0))
+            if ($gatewayIndex -eq 'X' -or $gatewayIndex -eq 'x') {
+                return
+            }
+            try {
+                Remove-NetRoute -NextHop $gateways[$gatewayIndex].NextHop -InterfaceIndex $NetworkAdapter.InterfaceIndex -CimSession $CimSession -EA stop
+                Clear-Host
+                Write-Host "$($gateways[$gatewayIndex].NextHop) has been successfully removed from the Default Gateways"
+                Write-Log "$($gateways[$gatewayIndex]) has been successfully removed from the Default Gateways"
+            }
+            catch {
+                Write-Log -Message $_.Exception.Message -Level Error
+                Write-Host "An error occurred:"
+                Write-Host $_.Exception.Message
+                Write-Host $_.ScriptStackTrace
+            }
         }
     }
-    else {
+    catch {
         Write-Host "There are no default gateways to remove."
     }
 }
@@ -346,7 +357,7 @@ function Set-DnsAddress {
     }
     try {
 
-        $dns = Set-DnsClientServerAddress @dnsConfig -PassThru
+        $dns = Set-DnsClientServerAddress @dnsConfig -PassThru -EA stop
         Clear-Host
         Write-Host "DNS Configuration has been successfully updated. Current values are `n" `
             "`tDNS Address: $($dns.ServerAddresses)"
@@ -354,12 +365,11 @@ function Set-DnsAddress {
         # Log something here
     }
     catch {
-        Write-Log -Message $_.Exception.Message -Level "Error"
+        Write-Log -Message $_.Exception.Message -Level Error
         Write-Host "An error occurred:"
         Write-Host $_.Exception.Message
         Write-Host $_.ScriptStackTrace
     }
-    $dns
 }
 
 function Set-DnsSuffix {
@@ -374,7 +384,7 @@ function Set-DnsSuffix {
         $CimSession
     )
     try {
-        Get-DnsClientGlobalSetting -CimSession $CimSession | Select-Object -Property SuffixSearchList
+        Get-DnsClientGlobalSetting -CimSession $CimSession | Select-Object -Property SuffixSearchList -EA stop
         do {
             $dns1 = Read-Host "Enter a valid DNS suffix (Domain)"
         } while ($dns1 -notmatch $DomainNameRegex)
@@ -385,19 +395,18 @@ function Set-DnsSuffix {
             SuffixSearchList = @($dns1, $dns2)
             CimSession       = $CimSession
         }
-        $dnsSuffix = Set-DnsClientGlobalSetting @dnsConfig -PassThru
+        $dnsSuffix = Set-DnsClientGlobalSetting @dnsConfig -PassThru -EA stop
         Clear-Host
         Write-Host "DNS Suffix has been successfully updated. Current values are `n" `
             "`tDNS Suffix: $($dnsSuffix.SuffixSearchList)"
         Write-Log "DNS Suffix has been successfully updated. Current values are `n`tDNS Suffix: $($dnsSuffix.SuffixSearchList)"
     }
     catch {
-        Write-Log -Message $_.Exception.Message -Level "Error"
+        Write-Log -Message $_.Exception.Message -Level Error
         Write-Host "An error occurred:"
         Write-Host $_.Exception.Message
         Write-Host $_.ScriptStackTrace
     }
-    $dnsSuffix
 }
 
 # -----------------------------------------------------------------------
