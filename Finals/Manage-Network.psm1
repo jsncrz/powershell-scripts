@@ -267,7 +267,7 @@ function New-DefaultGateway {
         $defaultGateway = Read-Host "Enter a valid Gateway (0.0.0.0 - 255.255.255.255)"
     } while ($defaultGateway -notmatch $IpAddressRegex)
     try {
-        New-NetRoute -DestinationPrefix "0.0.0.0/0" -InterfaceIndex $NetworkAdapter.InterfaceIndex -NextHop $defaultGateway  -CimSession $CimSession
+        $null = New-NetRoute -DestinationPrefix "0.0.0.0/0" -InterfaceIndex $NetworkAdapter.InterfaceIndex -NextHop $defaultGateway  -CimSession $CimSession
         Clear-Host
         Write-Host "$defaultGateway has been sucessfully added to the Default Gateways"
         Write-Log "$defaultGateway has been sucessfully added to the Default Gateways"
@@ -303,10 +303,10 @@ function Remove-DefaultGateway {
             $gatewayIndex = Read-Host "Enter the index of the Default Gateway to be removed from the list above"
         } while ($gatewayIndex -notmatch $NumericRegex -or [int]$gatewayIndex -ge $gateways.Length -or [int]$gatewayIndex -lt 0)
         try {
-            Remove-NetRoute -NextHop $gateways[$gatewayIndex] -InterfaceIndex $NetworkAdapter.InterfaceIndex -CimSession $CimSession
+            $null = Remove-NetRoute -NextHop $gateways[$gatewayIndex] -InterfaceIndex $NetworkAdapter.InterfaceIndex -CimSession $CimSession
             Clear-Host
-            Write-Host "$($gateways[$gatewayIndex])has been sucessfully removed from the Default Gateways"
-            Write-Log "$($gateways[$gatewayIndex])has been sucessfully removed from the Default Gateways"
+            Write-Host "$($gateways[$gatewayIndex]) has been sucessfully removed from the Default Gateways"
+            Write-Log "$($gateways[$gatewayIndex]) has been sucessfully removed from the Default Gateways"
         }
         catch {
             Write-Log -Message $_.Exception.Message -Level "Error"
